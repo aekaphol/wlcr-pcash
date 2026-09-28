@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f97316"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="WL-Cash CR"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="favicon.png"><link rel="manifest" href="manifest.webmanifest">
+<title>WL-Cash | ใบเบิกเงินสดย่อย เวียงหลวง เชียงราย</title>
+<style>
+:root{--o:#f97316;--bg:#fff7ed;--c:#fff;--t:#1f2937;--m:#6b7280;--b:#fed7aa;--g:#16a34a;--bl:#2563eb;--r:#dc2626}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 "Noto Sans Thai","Sarabun",system-ui,sans-serif;background:var(--bg);color:var(--t);padding-bottom:40px}
+header{background:var(--o);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+header h1{margin:0;font-size:18px}header small{opacity:.9}header .sp{flex:1}
+header input,header span{background:#fff3;border:0;border-radius:8px;color:#fff;padding:5px 8px;font:inherit}
+.tabs{display:flex;background:#fff;border-bottom:2px solid var(--b);position:sticky;top:0;z-index:5}
+.tabs button{flex:1;border:0;background:none;padding:11px 4px;font:inherit;color:var(--m);border-bottom:3px solid transparent}
+.tabs button.on{color:var(--o);border-color:var(--o);font-weight:700}
+main{max-width:720px;margin:0 auto;padding:12px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px;margin-bottom:12px}
+h2{font-size:16px;margin:0 0 8px}label{display:block;font-size:13px;color:var(--m);margin-top:8px}
+input,select{width:100%;padding:9px;border:1px solid var(--b);border-radius:8px;font:inherit;background:#fff}
+input:disabled{background:#f3f4f6}
+.row{display:flex;gap:8px}.row>*{flex:1}
+button.p,button.s,button.d{padding:10px 14px;border-radius:10px;border:0;font:inherit;font-weight:600;cursor:pointer}
+button.p{background:var(--o);color:#fff}button.s{background:#fff;border:1px solid var(--o);color:var(--o)}button.d{background:#fee2e2;color:var(--r)}
+button:disabled{opacity:.4}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chips button{border:1px solid var(--b);background:#fff;border-radius:99px;padding:4px 10px;font:inherit;font-size:13px}
+.it{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--b)}.it b{flex:1}.it small{color:var(--m);display:block}
+.tot{display:flex;justify-content:space-between;padding:3px 0}.tot.big{font-weight:700;font-size:17px;color:var(--o);border-top:2px solid var(--b);margin-top:6px;padding-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--b)}th:first-child,td:first-child{text-align:left}
+.bars{display:flex;align-items:flex-end;gap:6px;height:150px;overflow-x:auto;padding-bottom:4px}.day{display:flex;gap:2px;align-items:flex-end;height:100%;min-width:34px}
+.day div{width:14px}.stk{display:flex;flex-direction:column-reverse}.lg span{margin-right:10px;font-size:12px}
+.ok{background:#dcfce7;color:var(--g);padding:6px 10px;border-radius:8px;margin-bottom:10px;font-weight:600}
+#pin{position:fixed;inset:0;background:var(--o);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:12px}
+#pin .k{display:grid;grid-template-columns:repeat(3,72px);gap:10px}#pin .k button{height:60px;border-radius:50%;border:0;font-size:22px;background:#fff3;color:#fff}
+#dots{font-size:28px;letter-spacing:8px;min-height:40px}
+</style></head><body>
+<div id="pin"><img src="icon-192.png" alt="" width="96" height="96" style="border-radius:20px"><h1 style="margin:0">WL-Cash</h1><div id="branchP"></div><div>กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</div><div id="dots"></div><div class="k" id="kp"></div></div>
+<header><div><h1>WL-Cash</h1><small id="branch"></small></div><div class="sp"></div><span id="mode"></span><input type="date" id="date"></header>
+<nav class="tabs"><button data-t="petty">💵 เงินสดย่อย</button><button data-t="main">🥩 วัตถุดิบหลัก</button><button data-t="sum">📊 สรุป</button></nav>
+<main id="main"></main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ===== ตั้งค่าสาขา: แก้ตรงนี้ ===== */
+const CONFIG={
+  branch:'เวียงหลวง สาขาเมืองเชียงราย',
+  pin:'2551',
+  prefix:'cr',           // คำนำหน้า collection ของสาขานี้ (ใช้แยกข้อมูล)
+  firebase:{
+    apiKey:"AIzaSyC43leZ2mqeo05YACOfJRcaMKoz9mEAP3g",
+    authDomain:"wlcr-pcash.firebaseapp.com",
+    projectId:"wlcr-pcash",
+    storageBucket:"wlcr-pcash.firebasestorage.app",
+    messagingSenderId:"42601474410",
+    appId:"1:42601474410:web:3e5e6652cb65dacba21d13",
+    measurementId:"G-KJ1SJK9LP7"
+  }
+};
+const $=s=>document.querySelector(s),fmt=n=>'฿'+(+n||0).toLocaleString('th-TH'),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+let db=null,mode='local',docs={},names={petty:[],main:[]},date=today(),tab='petty',from=today().slice(0,8)+'01',to=today();
+const LK=CONFIG.prefix+'_wlcash';
+
+/* ===== ฐานข้อมูล ===== */
+function init(){
+  if(CONFIG.firebase.projectId){
+    try{firebase.initializeApp(CONFIG.firebase);db=firebase.firestore();mode='cloud';
+      db.collection(CONFIG.prefix+'_vouchers').onSnapshot(s=>{s.docChanges().forEach(c=>{if(c.type=='removed')delete docs[c.doc.id];else docs[c.doc.id]=c.doc.data()});render()});
+      db.doc(CONFIG.prefix+'_meta/names').onSnapshot(s=>{if(s.exists)names=Object.assign({petty:[],main:[]},s.data());render()});
+    }catch(e){console.error(e);db=null;mode='local'}
+  }
+  if(!db){try{const s=JSON.parse(localStorage.getItem(LK)||'{}');docs=s.docs||{};names=s.names||names}catch(e){}}
+  render();
+}
+function persist(id){
+  if(db){db.collection(CONFIG.prefix+'_vouchers').doc(id).set(docs[id]);db.doc(CONFIG.prefix+'_meta/names').set(names)}
+  else try{localStorage.setItem(LK,JSON.stringify({docs,names}))}catch(e){}
+}
+
+/* ===== คำนวณ ===== */
+const cur=()=>docs[date]||(docs[date]={date,sales:0,open:null,extra:0,items:[],ok:false});
+const calc=d=>{let cash=0,card=0,main=0;d.items.forEach(i=>{if(i.t=='main')main+=+i.v;else if(i.p=='card')card+=+i.v;else cash+=+i.v});return{cash,card,main}};
+function autoOpen(dt){const k=Object.keys(docs).filter(x=>x<dt&&docs[x].ok).sort();return k.length?closeOf(docs[k.pop()]):0}
+const openOf=d=>d.open==null?autoOpen(d.date):+d.open;
+const closeOf=d=>openOf(d)+(+d.extra||0)-calc(d).cash;
+
+/* ===== หน้าจอ ===== */
+function render(){
+  $('#branch').textContent=CONFIG.branch;$('#mode').textContent=mode=='cloud'?'☁️ ซิงค์':'📴 เครื่องเดียว';$('#date').value=date;
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
+  $('#main').innerHTML=tab=='sum'?summary():voucher();
+}
+function voucher(){
+  const d=cur(),L=d.ok,c=calc(d),t=tab,dis=L?'disabled':'';
+  const rows=d.items.map((x,i)=>({x,i})).filter(z=>(z.x.t||'petty')==t);
+  let h=L?'<div class="ok">✓ ยืนยันบันทึกแล้ว</div>':'';
+  if(t=='petty')h+=`<div class="card"><h2>💰 ยอดขายประจำวัน</h2><label>ยอดขายวันนี้ (บาท)</label><input type="number" inputmode="decimal" ${dis} value="${d.sales||''}" onchange="setF('sales',this.value)">
+  <h2 style="margin-top:14px">ยอดเงินตั้งต้น</h2><div class="row"><div><label>คงเหลือเมื่อวาน (แก้ได้)</label><input type="number" ${dis} value="${openOf(d)}" onchange="setF('open',this.value)"></div>
+  <div><label>เบิกเพิ่ม (บาท)</label><input type="number" ${dis} value="${d.extra||''}" onchange="setF('extra',this.value)"></div></div></div>`;
+  h+=`<div class="card"><h2>${t=='petty'?'รายการเบิกจ่าย':'วัตถุดิบหลัก'}</h2>`;
+  h+=rows.length?rows.map(({x,i})=>`<div class="it"><b>${esc(x.n)}<small>${x.b?'บิล '+esc(x.b)+' · ':''}${t=='petty'?(x.p=='card'?'บัตร':'เงินสด'):''}${x.note?' · '+esc(x.note):''}</small></b><span>${fmt(x.v)}</span>${L?'':`<button class="d" onclick="del(${i})">✕</button>`}</div>`).join(''):'<div style="color:var(--m)">ยังไม่มีรายการ</div>';
+  if(!L){h+=`<div class="chips">${names[t].map(n=>`<button onclick="pick(this.textContent)">${esc(n)}</button>`).join('')}</div>
+  <input id="in-n" placeholder="ชื่อรายการ / วัตถุดิบใหม่ (ระบบจะจำไว้)"><div class="row"><input id="in-b" placeholder="เลขบิล"><input id="in-v" type="number" inputmode="decimal" placeholder="มูลค่า (บาท)"></div>
+  <div class="row">${t=='petty'?'<select id="in-p"><option value="cash">เงินสด</option><option value="card">บัตร</option></select>':''}<input id="in-o" placeholder="หมายเหตุ"></div><br><button class="p" style="width:100%" onclick="add()">+ เพิ่มรายการ</button>`}
+  h+='</div><div class="card">';
+  if(t=='petty')h+=`<div class="tot"><span>เงินสด</span><span>${fmt(c.cash)}</span></div><div class="tot"><span>บัตร</span><span>${fmt(c.card)}</span></div><div class="tot"><span>รวมรายจ่าย</span><span>${fmt(c.cash+c.card)}</span></div><div class="tot big"><span>คงเหลือเงินสด</span><span>${fmt(closeOf(d))}</span></div>`;
+  else h+=`<div class="tot big"><span>รวมวัตถุดิบหลัก</span><span>${fmt(c.main)}</span></div>`;
+  h+=L?'<br><button class="s" onclick="unlock()">↩ ยกเลิกยืนยัน (กลับไปแก้ไข)</button>':'<br><button class="p" style="width:100%" onclick="lock()">✓ ยืนยันบันทึก</button>';
+  return h+'</div>';
+}
+function range(){return Object.values(docs).filter(d=>d.ok&&d.date>=from&&d.date<=to).sort((a,b)=>a.date<b.date?-1:1)}
+function summary(){
+  const R=range(),S=R.map(d=>({d,c:calc(d)})),tot=S.reduce((a,z)=>({s:a.s+ +z.d.sales,c:a.c+z.c.cash,k:a.k+z.c.card,m:a.m+z.c.main}),{s:0,c:0,k:0,m:0});
+  const mx=Math.max(1,...S.map(z=>Math.max(+z.d.sales,z.c.cash+z.c.card+z.c.main))),H=130;
+  let h=`<div class="card"><h2>📊 สรุปยอดขาย เทียบ เบิกจ่าย</h2><div class="row"><div><label>ตั้งแต่วันที่</label><input type="date" value="${from}" onchange="from=this.value;render()"></div><div><label>ถึงวันที่</label><input type="date" value="${to}" onchange="to=this.value;render()"></div></div>
+  <div class="tot" style="margin-top:8px"><span>ยอดขายรวม</span><b>${fmt(tot.s)}</b></div><div class="tot"><span>เงินสด</span><span>${fmt(tot.c)}</span></div><div class="tot"><span>บัตร</span><span>${fmt(tot.k)}</span></div><div class="tot"><span>วัตถุดิบหลัก</span><span>${fmt(tot.m)}</span></div></div>`;
+  h+=`<div class="card"><h2>📈 กราฟรายวัน</h2><div class="lg"><span style="color:var(--g)">■ ยอดขาย</span><span style="color:var(--o)">■ เงินสด</span><span style="color:var(--bl)">■ บัตร</span><span style="color:var(--r)">■ วัตถุดิบหลัก</span></div><div class="bars">${S.map(z=>`<div class="day" title="${z.d.date}"><div style="height:${z.d.sales/mx*H}px;background:var(--g)"></div><div class="stk"><div style="height:${z.c.cash/mx*H}px;background:var(--o)"></div><div style="height:${z.c.card/mx*H}px;background:var(--bl)"></div><div style="height:${z.c.main/mx*H}px;background:var(--r)"></div></div></div>`).join('')||'<span style="color:var(--m)">ยังไม่มีใบที่ยืนยันบันทึก</span>'}</div></div>`;
+  h+=`<div class="card"><h2>รายละเอียดรายวัน</h2><table><tr><th>วันที่</th><th>ขาย</th><th>สด</th><th>บัตร</th><th>วัตถุดิบ</th><th>คงเหลือ</th></tr>${S.map(z=>`<tr onclick="go('${z.d.date}')"><td>${z.d.date.slice(5)}</td><td>${z.d.sales||0}</td><td>${z.c.cash}</td><td>${z.c.card}</td><td>${z.c.main}</td><td>${closeOf(z.d)}</td></tr>`).join('')}</table></div>
+  <div class="card"><h2>📁 รายงาน CSV</h2><button class="p" onclick="csv()">⬇️ ดาวน์โหลดรายงาน CSV</button><p style="font-size:12px;color:var(--m)">รวมเฉพาะใบที่ "ยืนยันบันทึก" แล้วในช่วงวันที่ข้างต้น</p></div>`;
+  return h;
+}
+
+/* ===== การทำงาน ===== */
+function setF(k,v){const d=cur();d[k]=v===''?(k=='open'?null:0):+v;persist(date);render()}
+function pick(n){$('#in-n').value=n;$('#in-v').focus()}
+function add(){
+  const n=$('#in-n').value.trim(),v=+$('#in-v').value;if(!n||!(v>0)){alert('กรุณาใส่ชื่อรายการและมูลค่า');return}
+  const d=cur();d.items.push({t:tab,n,b:$('#in-b').value.trim(),v,p:$('#in-p')?$('#in-p').value:'cash',note:$('#in-o').value.trim()});
+  if(!names[tab].includes(n))names[tab].push(n);persist(date);render();
+}
+function del(i){if(!confirm('ลบรายการนี้?'))return;cur().items.splice(i,1);persist(date);render()}
+function lock(){const d=cur();if(!d.items.length&&!d.sales){alert('ยังไม่มีข้อมูลให้บันทึก');return}d.ok=true;persist(date);render()}
+function unlock(){cur().ok=false;persist(date);render()}
+function go(dt){date=dt;tab='petty';render();scrollTo(0,0)}
+function csv(){
+  const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"',L=[['วันที่','ยอดขาย','ลำดับ','รายการ','ประเภท','บิล','มูลค่า','ชำระ','หมายเหตุ'].map(q).join(',')];
+  range().forEach(d=>d.items.forEach((x,i)=>L.push([d.date,d.sales||0,i+1,x.n,x.t=='main'?'วัตถุดิบหลัก':'เงินสดย่อย',x.b,x.v,x.t=='main'?'':(x.p=='card'?'บัตร':'เงินสด'),x.note].map(q).join(','))));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+L.join('\n')],{type:'text/csv'}));a.download=`WL-Cash-${CONFIG.prefix}-${from}_${to}.csv`;a.click();
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
+$('#date').onchange=e=>{date=e.target.value||today();render()};
+
+/* ===== รหัสผ่าน ===== */
+let pv='';const dots=()=>$('#dots').textContent='●'.repeat(pv.length);
+$('#branchP').textContent=CONFIG.branch;
+'123456789C0⌫'.split('').forEach(k=>{const b=document.createElement('button');b.textContent=k=='C'?'ล้าง':k;b.style.fontSize=k=='C'?'15px':'';b.onclick=()=>{
+  if(k=='C')pv='';else if(k=='⌫')pv=pv.slice(0,-1);else pv+=k;dots();
+  if(pv==CONFIG.pin){sessionStorage.setItem(LK+'_in','1');$('#pin').remove()}else if(pv.length>=CONFIG.pin.length){pv='';dots();$('#dots').textContent='รหัสไม่ถูกต้อง'}};$('#kp').appendChild(b)});
+if(sessionStorage.getItem(LK+'_in'))$('#pin').remove();
+init();
+</script></body></html>
