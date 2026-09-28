@@ -22,6 +22,7 @@ h2 i{font-style:normal;background:var(--o);color:#fff;width:24px;height:24px;bor
 label{display:block;font-size:13px;color:var(--m);margin:8px 0 3px}
 input,select{width:100%;min-height:46px;padding:9px 12px;border:1.5px solid var(--b);border-radius:12px;font:inherit;background:#fff}
 input:focus{outline:2px solid var(--o);border-color:var(--o)}input:disabled{background:#f3f4f6}
+.ro{min-height:46px;display:flex;align-items:center;justify-content:flex-end;padding:9px 12px;border-radius:12px;background:#f3f4f6;font-weight:700;font-size:18px}
 .xl{font-size:24px;font-weight:700;text-align:right}
 .row{display:flex;gap:8px;align-items:flex-end}.row>*{flex:1}
 button{font:inherit;cursor:pointer}
@@ -98,12 +99,13 @@ function persist(id){
 /* ===== คำนวณ ===== */
 const cur=()=>docs[date]||(docs[date]={date,sales:0,open:null,extra:0,items:[],ok:false});
 const calc=d=>{let cash=0,card=0,main=0;d.items.forEach(i=>{if(i.t=='main')main+=+i.v;else if(i.p=='card')card+=+i.v;else cash+=+i.v});return{cash,card,main}};
-function autoOpen(dt){const k=Object.keys(docs).filter(x=>x<dt&&docs[x].ok).sort();return k.length?closeOf(docs[k.pop()]):0}
-const openOf=d=>d.open==null?autoOpen(d.date):+d.open;
+const prevOf=dt=>{const k=Object.keys(docs).filter(x=>x<dt&&docs[x].ok).sort();return k.length?docs[k.pop()]:null};
+const openOf=d=>{const pv=prevOf(d.date);return pv?closeOf(pv):(+d.open||0)};
 const closeOf=d=>openOf(d)+(+d.extra||0)-calc(d).cash;
 
 /* ===== หน้าจอ ===== */
 let review=false,sh=null;
+const billTxt=x=>(x.t=='main'||!x.b)?'':(x.b=='ไม่มี'?'ไม่มีบิล':x.b=='มี'?'🧾 มีบิล':'บิล '+x.b);
 const TH=dt=>{const[y,m,d]=dt.split('-');return +d+' '+'ม.ค.,ก.พ.,มี.ค.,เม.ย.,พ.ค.,มิ.ย.,ก.ค.,ส.ค.,ก.ย.,ต.ค.,พ.ย.,ธ.ค.'.split(',')[m-1]+' '+(+y+543)};
 function render(){
   const d=cur();
@@ -114,15 +116,15 @@ function render(){
   bar();
 }
 function voucher(){
-  const d=cur(),L=d.ok,c=calc(d),t=tab,dis=L?'disabled':'',o=openOf(d),ex=+d.extra||0;
+  const d=cur(),L=d.ok,c=calc(d),t=tab,dis=L?'disabled':'',o=openOf(d),ex=+d.extra||0,pv=prevOf(d.date);
   const rows=d.items.map((x,i)=>({x,i})).filter(z=>(z.x.t||'petty')==t);
   const sum={};rows.forEach(z=>sum[z.x.n]=(sum[z.x.n]||0)+ +z.x.v);
   let h=L?'<div class="ok">✅ ยืนยันบันทึกแล้ว <a onclick="unlock()">ยกเลิกยืนยันเพื่อแก้ไข</a></div>':'';
   if(t=='petty')h+=`<section class="card"><h2>💰 ยอดขายประจำวัน</h2><label>ยอดขายวันนี้ (บาท)</label><input class="xl" type="number" inputmode="decimal" placeholder="0" ${dis} value="${d.sales||''}" onchange="setF('sales',this.value)"></section>
-  <section class="card"><h2><i>1</i>ยอดเงินตั้งต้น</h2><div class="row"><div><label>คงเหลือเงินสดเมื่อวาน</label><input type="number" inputmode="decimal" ${dis} value="${o}" onchange="setF('open',this.value)"></div><div><label>เบิกเพิ่ม (บาท)</label><input type="number" inputmode="decimal" placeholder="0" ${dis} value="${ex||''}" onchange="setF('extra',this.value)"></div></div><div class="tot big"><span>รวมเป็นเงินทั้งหมด</span><span>${fmt(o+ex)}</span></div></section>`;
+  <section class="card"><h2><i>1</i>ยอดเงินตั้งต้น</h2><div class="row"><div><label>ยอดคงเหลือเงินสดเมื่อวาน</label>${pv?`<div class="ro">${fmt(o)}</div>`:`<input type="number" inputmode="decimal" placeholder="0" ${dis} value="${d.open||''}" onchange="setF('open',this.value)">`}</div><div><label>เบิกเพิ่ม (บาท)</label><input type="number" inputmode="decimal" placeholder="0" ${dis} value="${ex||''}" onchange="setF('extra',this.value)"></div></div><div class="tot big"><span>รวมเป็นเงินทั้งหมด</span><span>${fmt(o+ex)}</span></div><p class="hint">${pv?`ดึงจากยอดคงเหลือของใบล่าสุดที่ยืนยันแล้ว (${TH(pv.date)}) แก้ไขเองไม่ได้`:'ยังไม่มีใบก่อนหน้า กรอกยอดเริ่มต้นได้เฉพาะครั้งแรก'}</p></section>`;
   h+=`<section class="card"><h2>${t=='petty'?'<i>2</i>รายการเบิกจ่าย':'🥩 รายการวัตถุดิบหลัก'}</h2>`;
   if(!L)h+=`<p class="hint">แตะ${t=='petty'?'รายการ':'วัตถุดิบ'}เพื่อเพิ่มรายการอย่างรวดเร็ว</p><div class="chips">${allN(t).map((n,k)=>`<button class="${sum[n]?'has':''}" onclick="openSheet(${k})">${sum[n]?'✓ ':''}${esc(n)}</button>`).join('')}</div><button class="add" onclick="openSheet(-1)">+ เพิ่มรายการ / วัตถุดิบใหม่</button><p class="hint">พิมพ์ชื่อใหม่ได้เลย ระบบจะจำไว้ให้เลือกใช้ในวันถัดไปโดยอัตโนมัติ</p>`;
-  h+=rows.length?rows.map(({x,i})=>`<div class="it" ${L?'':`onclick="openSheet(-1,${i})"`}><b>${esc(x.n)}<small>${x.b?'บิล '+esc(x.b)+' · ':''}${t=='petty'?(x.p=='card'?'💳 บัตร':'💵 เงินสด'):''}${x.note?' · '+esc(x.note):''}</small></b><span>${fmt(x.v)}</span></div>`).join(''):'<div class="empty">ยังไม่มีรายการ</div>';
+  h+=rows.length?rows.map(({x,i})=>`<div class="it" ${L?'':`onclick="openSheet(-1,${i})"`}><b>${esc(x.n)}<small>${t=='petty'?(x.p=='card'?'💳 บัตร':'💵 เงินสด')+(billTxt(x)?' · '+esc(billTxt(x)):''):''}${x.note?' · '+esc(x.note):''}</small></b><span>${fmt(x.v)}</span></div>`).join(''):'<div class="empty">ยังไม่มีรายการ</div>';
   h+='</section>';
   h+=t=='petty'?`<section class="card"><h2><i>3</i>สรุปยอดปัจจุบัน</h2><div class="tot"><span>เงินสด</span><span>${fmt(c.cash)}</span></div><div class="tot"><span>บัตร</span><span>${fmt(c.card)}</span></div><div class="tot"><span>รวมทั้งหมด</span><span>${fmt(c.cash+c.card)}</span></div><div class="tot big"><span>คงเหลือเงินสด</span><span>${fmt(closeOf(d))}</span></div></section>`:`<section class="card"><div class="tot big" style="border:0;margin:0;padding:0"><span>รวมวัตถุดิบหลัก</span><span>${fmt(c.main)}</span></div></section>`;
   return h;
@@ -130,7 +132,7 @@ function voucher(){
 function reviewV(){
   const d=cur(),c=calc(d),o=openOf(d),ex=+d.extra||0;
   return `<section class="card"><h2>📊 สรุปใบเบิกเงินสดย่อย</h2><div class="tot"><span>ยอดขายประจำวัน</span><b>${fmt(d.sales)}</b></div><div class="tot"><span>ยอดยกมา</span><span>${fmt(o)}</span></div><div class="tot"><span>เบิกเพิ่ม</span><span>${fmt(ex)}</span></div></section>
-  <section class="card"><h2>รายการทั้งหมด</h2><div style="overflow-x:auto"><table class="tl"><tr><th>No</th><th>รายการ</th><th>บิล</th><th>มูลค่า</th><th>ชำระ</th><th>หมายเหตุ</th></tr>${d.items.map((x,i)=>`<tr><td>${i+1}</td><td>${x.t=='main'?'🥩 ':''}${esc(x.n)}</td><td>${esc(x.b)}</td><td>${x.v}</td><td>${x.t=='main'?'-':(x.p=='card'?'บัตร':'เงินสด')}</td><td>${esc(x.note)}</td></tr>`).join('')}</table></div></section>
+  <section class="card"><h2>รายการทั้งหมด</h2><div style="overflow-x:auto"><table class="tl"><tr><th>No</th><th>รายการ</th><th>บิล</th><th>มูลค่า</th><th>ชำระ</th><th>หมายเหตุ</th></tr>${d.items.map((x,i)=>`<tr><td>${i+1}</td><td>${x.t=='main'?'🥩 ':''}${esc(x.n)}</td><td>${x.t=='main'?'-':esc(x.b||'-')}</td><td>${x.v}</td><td>${x.t=='main'?'-':(x.p=='card'?'บัตร':'เงินสด')}</td><td>${esc(x.note)}</td></tr>`).join('')}</table></div></section>
   <section class="card"><h2>สรุปยอดรวม</h2><div class="tot"><span>เงินสด</span><span>${fmt(c.cash)}</span></div><div class="tot"><span>บัตร</span><span>${fmt(c.card)}</span></div><div class="tot"><span>รวมทั้งหมด</span><span>${fmt(c.cash+c.card)}</span></div><div class="tot"><span>วัตถุดิบหลัก</span><span>${fmt(c.main)}</span></div><div class="tot big"><span>คงเหลือเงินสด</span><span>${fmt(closeOf(d))}</span></div></section>
   <div class="row"><button class="s" onclick="review=false;render()">← กลับไปแก้ไข</button><button class="p" onclick="lock()">✓ ยืนยันบันทึก</button></div>`;
 }
@@ -159,16 +161,18 @@ function unlock(){cur().ok=false;persist(date);render()}
 function go(dt){date=dt;tab='petty';review=false;render();scrollTo(0,0)}
 function openSheet(k,edit){
   const d=cur();if(d.ok)return;const it=edit!=null?d.items[edit]:null;
-  sh={edit:it?edit:null,p:it?(it.p||'cash'):'cash'};
+  sh={edit:it?edit:null,p:it?(it.p||'cash'):'cash',b:it&&it.b=='ไม่มี'?'ไม่มี':'มี'};
   const nm=it?it.n:(k>=0?allN(tab)[k]:'');
-  $('#sheet').innerHTML=`<div class="box"><h3>${it?'แก้ไขรายการ':'เพิ่มรายการ'}</h3><label>ชื่อรายการ</label><input id="s-n" value="${esc(nm)}" placeholder="พิมพ์ชื่อใหม่ได้เลย"><label>มูลค่า (บาท)</label><input id="s-v" class="xl" type="number" inputmode="decimal" placeholder="0" value="${it?it.v:''}">${tab=='petty'?`<label>ชำระ</label><div class="seg"><button id="p-cash" onclick="setP('cash')">💵 เงินสด</button><button id="p-card" onclick="setP('card')">💳 บัตร</button></div>`:''}<div class="row"><div><label>เลขบิล</label><input id="s-b" value="${esc(it?it.b:'')}"></div><div><label>หมายเหตุ</label><input id="s-o" value="${esc(it?it.note:'')}"></div></div><div class="row" style="margin-top:14px"><button class="s" onclick="closeSheet()">ยกเลิก</button>${it?'<button class="d" onclick="delItem()">ลบ</button>':''}<button class="p" onclick="saveItem()">${it?'บันทึก':'เพิ่ม'}</button></div></div>`;
-  $('#sheet').hidden=false;setP(sh.p);setTimeout(()=>$(nm?'#s-v':'#s-n').focus(),80);
+  $('#sheet').innerHTML=`<div class="box"><h3>${it?'แก้ไขรายการ':'เพิ่มรายการ'}</h3><label>ชื่อรายการ</label><input id="s-n" value="${esc(nm)}" placeholder="พิมพ์ชื่อใหม่ได้เลย"><label>มูลค่า (บาท)</label><input id="s-v" class="xl" type="number" inputmode="decimal" placeholder="0" value="${it?it.v:''}">${tab=='petty'?`<label>ชำระ</label><div class="seg"><button id="p-cash" onclick="setP('cash')">💵 เงินสด</button><button id="p-card" onclick="setP('card')">💳 บัตร</button></div>`:''}${tab=='petty'?`<label>บิล</label><div class="seg"><button id="b-y" onclick="setB('มี')">🧾 มีบิล</button><button id="b-n" onclick="setB('ไม่มี')">ไม่มีบิล</button></div>`:''}<label>หมายเหตุ</label><input id="s-o" value="${esc(it?it.note:'')}"><div class="row" style="margin-top:14px"><button class="s" onclick="closeSheet()">ยกเลิก</button>${it?'<button class="d" onclick="delItem()">ลบ</button>':''}<button class="p" onclick="saveItem()">${it?'บันทึก':'เพิ่ม'}</button></div></div>`;
+  $('#sheet').hidden=false;setP(sh.p);setB(sh.b);setTimeout(()=>$(nm?'#s-v':'#s-n').focus(),80);
 }
 function setP(p){sh.p=p;['cash','card'].forEach(k=>{const e=$('#p-'+k);if(e)e.classList.toggle('on',k==p)})}
+function setB(v){sh.b=v;[['มี','y'],['ไม่มี','n']].forEach(([k,i])=>{const e=$('#b-'+i);if(e)e.classList.toggle('on',k==v)})}
 function closeSheet(){$('#sheet').hidden=true;sh=null}
 function saveItem(){
   const n=$('#s-n').value.trim(),v=+$('#s-v').value;if(!n||!(v>0)){alert('กรุณาใส่ชื่อรายการและมูลค่า');return}
-  const d=cur(),x={t:tab,n,b:$('#s-b').value.trim(),v,p:tab=='petty'?sh.p:'cash',note:$('#s-o').value.trim()};
+  if(tab=='petty'&&!sh.b){alert('กรุณาเลือกว่ามีบิลหรือไม่มีบิล');return}
+  const d=cur(),x={t:tab,n,b:tab=='petty'?sh.b:'',v,p:tab=='petty'?sh.p:'cash',note:$('#s-o').value.trim()};
   if(sh.edit!=null)d.items[sh.edit]=x;else d.items.push(x);
   if(!allN(tab).includes(n))names[tab].push(n);
   closeSheet();persist(date);render();
