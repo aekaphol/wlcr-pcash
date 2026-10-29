@@ -23,6 +23,15 @@ label{display:block;font-size:13px;color:var(--m);margin:8px 0 3px}
 input,select{width:100%;min-height:46px;padding:9px 12px;border:1.5px solid var(--b);border-radius:12px;font:inherit;background:#fff}
 input:focus{outline:2px solid var(--o);border-color:var(--o)}input:disabled{background:#f3f4f6}
 .ro{min-height:46px;display:flex;align-items:center;justify-content:flex-end;padding:9px 12px;border-radius:12px;background:#f3f4f6;font-weight:700;font-size:18px}
+.gp{display:flex;justify-content:space-between;align-items:center;background:#f0fdf4;border:1.5px solid #86efac;border-radius:14px;padding:10px 12px;margin-top:10px}
+.gp.neg{background:#fef2f2;border-color:#fca5a5}.gp b{font-size:20px;color:var(--g)}.gp.neg b{color:var(--r)}.gp span{font-size:13px;color:var(--m);display:block}
+.pct{font-size:13px;font-weight:700;border-radius:99px;padding:2px 9px;background:#dcfce7;color:var(--g);white-space:nowrap}.pct.neg{background:#fee2e2;color:var(--r)}
+.vl{border:1.5px solid var(--b);border-radius:14px;padding:12px;margin-bottom:10px;background:#fff}.vl:active{background:var(--bg)}
+.vl .t{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.vl .t b{font-size:16px}.vl .t small{color:var(--m);font-weight:400;margin-left:6px}
+.vl .sa{display:flex;justify-content:space-between;font-size:17px;font-weight:700;padding-bottom:8px;border-bottom:1px dashed var(--b)}
+.vl dl{display:grid;grid-template-columns:1fr auto;gap:3px 12px;margin:8px 0 0;font-size:14px}.vl dt{color:var(--m)}.vl dd{margin:0;text-align:right;font-weight:600}
+.vl .gl{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--b);font-weight:700}
+.vl .gl em{font-style:normal;color:var(--g)}.vl .gl em.neg{color:var(--r)}
 .xl{font-size:24px;font-weight:700;text-align:right}
 .row{display:flex;gap:8px;align-items:flex-end}.row>*{flex:1}
 button{font:inherit;cursor:pointer}
@@ -74,7 +83,7 @@ const CONFIG={
     measurementId:"G-KJ1SJK9LP7"
   }
 };
-const $=s=>document.querySelector(s),fmt=n=>'฿'+(+n||0).toLocaleString('th-TH'),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=s=>document.querySelector(s),fmt=n=>{n=+n||0;return (n<0?'-':'')+'฿'+Math.abs(n).toLocaleString('th-TH')},esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 let db=null,mode='local',docs={},names={petty:[],main:[]},date=today(),tab='petty',from=today().slice(0,8)+'01',to=today();
 const allN=t=>[...new Set([...(CONFIG.defaults[t]||[]),...names[t]])];
@@ -142,13 +151,17 @@ function bar(){
   b.hidden=false;b.innerHTML=`<div><small>${tab=='petty'?'คงเหลือเงินสด':'รวมวัตถุดิบหลัก'}</small><b>${fmt(tab=='petty'?closeOf(d):calc(d).main)}</b></div><button class="p" onclick="toReview()">ตรวจสอบและบันทึก ›</button>`;
 }
 function range(){return Object.values(docs).filter(d=>d.ok&&d.date>=from&&d.date<=to).sort((a,b)=>a.date<b.date?-1:1)}
+const gpOf=(sales,c)=>{const g=(+sales||0)-c.cash-c.card-c.main;return{g,p:+sales>0?g/sales*100:null}};
+const pc=n=>n==null?'-':(Math.round(n*10)/10).toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const WD=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
 function summary(){
   const R=range(),S=R.map(d=>({d,c:calc(d)})),tot=S.reduce((a,z)=>({s:a.s+ +z.d.sales,c:a.c+z.c.cash,k:a.k+z.c.card,m:a.m+z.c.main}),{s:0,c:0,k:0,m:0});
+  const G=gpOf(tot.s,{cash:tot.c,card:tot.k,main:tot.m});
   const mx=Math.max(1,...S.map(z=>Math.max(+z.d.sales,z.c.cash+z.c.card+z.c.main))),H=130;
   let h=`<div class="card"><h2>📊 สรุปยอดขาย เทียบ เบิกจ่าย</h2><div class="row"><div><label>ตั้งแต่วันที่</label><input type="date" value="${from}" onchange="from=this.value;render()"></div><div><label>ถึงวันที่</label><input type="date" value="${to}" onchange="to=this.value;render()"></div></div>
-  <div class="tot" style="margin-top:8px"><span>ยอดขายรวม</span><b>${fmt(tot.s)}</b></div><div class="tot"><span>เงินสด</span><span>${fmt(tot.c)}</span></div><div class="tot"><span>บัตร</span><span>${fmt(tot.k)}</span></div><div class="tot"><span>วัตถุดิบหลัก</span><span>${fmt(tot.m)}</span></div></div>`;
+  <div class="tot" style="margin-top:8px"><span>ยอดขายรวม</span><b>${fmt(tot.s)}</b></div><div class="tot"><span>เงินสด</span><span>${fmt(tot.c)}</span></div><div class="tot"><span>บัตร</span><span>${fmt(tot.k)}</span></div><div class="tot"><span>วัตถุดิบหลัก</span><span>${fmt(tot.m)}</span></div><div class="gp ${G.g<0?'neg':''}"><div><span>กำไรขั้นต้น</span><small style="color:var(--m)">ยอดขาย − เงินสด − บัตร − วัตถุดิบหลัก</small></div><div style="text-align:right"><b>${fmt(G.g)}</b><span>${pc(G.p)} ของยอดขาย</span></div></div></div>`;
   h+=`<div class="card"><h2>📈 กราฟรายวัน</h2><div class="lg"><span style="color:var(--g)">■ ยอดขาย</span><span style="color:var(--o)">■ เงินสด</span><span style="color:var(--bl)">■ บัตร</span><span style="color:var(--r)">■ วัตถุดิบหลัก</span></div><div class="bars">${S.map(z=>`<div class="day" title="${z.d.date}"><div style="height:${z.d.sales/mx*H}px;background:var(--g)"></div><div class="stk"><div style="height:${z.c.cash/mx*H}px;background:var(--o)"></div><div style="height:${z.c.card/mx*H}px;background:var(--bl)"></div><div style="height:${z.c.main/mx*H}px;background:var(--r)"></div></div></div>`).join('')||'<span style="color:var(--m)">ยังไม่มีใบที่ยืนยันบันทึก</span>'}</div></div>`;
-  h+=`<div class="card"><h2>🧾 ใบเบิกที่บันทึกไว้ (แตะเพื่อเปิด)</h2><table><tr><th>วันที่</th><th>ขาย</th><th>สด</th><th>บัตร</th><th>วัตถุดิบ</th><th>คงเหลือ</th></tr>${S.map(z=>`<tr onclick="go('${z.d.date}')"><td>${z.d.date.slice(5)}</td><td>${z.d.sales||0}</td><td>${z.c.cash}</td><td>${z.c.card}</td><td>${z.c.main}</td><td>${closeOf(z.d)}</td></tr>`).join('')}</table></div>
+  h+=`<div class="card"><h2>🧾 ใบเบิกที่บันทึกไว้</h2><p class="hint">เรียงจากล่าสุด · แตะที่ใบเพื่อเปิดดู</p>${S.length?S.slice().reverse().map(z=>{const g=gpOf(z.d.sales,z.c),dd=new Date(z.d.date+'T00:00:00');return `<div class="vl" onclick="go('${z.d.date}')"><div class="t"><b>${TH(z.d.date)}<small>${WD[dd.getDay()]}</small></b><span class="pct ${g.g<0?'neg':''}">กำไร ${pc(g.p)}</span></div><div class="sa"><span>ยอดขาย</span><span>${fmt(z.d.sales)}</span></div><dl><dt>เงินสด</dt><dd>${fmt(z.c.cash)}</dd><dt>บัตร</dt><dd>${fmt(z.c.card)}</dd><dt>วัตถุดิบหลัก</dt><dd>${fmt(z.c.main)}</dd><dt>คงเหลือเงินสด</dt><dd>${fmt(closeOf(z.d))}</dd></dl><div class="gl"><span>กำไรขั้นต้น</span><em class="${g.g<0?'neg':''}">${fmt(g.g)}</em></div></div>`}).join(''):'<div class="empty">ยังไม่มีใบที่ยืนยันบันทึก</div>'}</div>
   <div class="card"><h2>📁 รายงาน CSV</h2><button class="p" onclick="csv()">⬇️ ดาวน์โหลดรายงาน CSV</button><p style="font-size:12px;color:var(--m)">รวมเฉพาะใบที่ "ยืนยันบันทึก" แล้วในช่วงวันที่ข้างต้น</p></div>`;
   return h;
 }
